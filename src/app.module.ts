@@ -1,19 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { AppDataSource } from './database/data-source';
 import { OrderModule } from './order/order.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => AppDataSource(configService),
-    }),
     EventEmitterModule.forRoot(),
+    DatabaseModule,
     OrderModule,
   ],
   controllers: [],

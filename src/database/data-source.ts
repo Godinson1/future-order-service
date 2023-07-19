@@ -1,12 +1,12 @@
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 
 config();
 
-export default new DataSource({
+const isTestEnv = process.env.NODE_ENV.trim() == 'test';
+export const ormOptions = {
   type: 'postgres',
-  entities: ['dist/**/*.entity.js'],
+  entities: [isTestEnv ? __dirname + '/../**/*.entity.{js,ts}' : 'dist/**/*.entity.js'],
   subscribers: ['dist/**/*.subscriber.js'],
   logging: false,
   synchronize: false,
@@ -17,32 +17,10 @@ export default new DataSource({
       port: Number(process.env.PGPORT),
       username: process.env.PGUSER,
       password: process.env.PGPASSWORD,
-      database: `${process.env.PGDATABASE}${process.env.NODE_ENV.trim() == 'test' ? '_test' : ''}`,
+      database: `${process.env.PGDATABASE}${isTestEnv ? '_test' : ''}`,
     },
     slaves: [],
   },
-});
-
-export const AppDataSource = async (configService): Promise<TypeOrmModuleOptions> => {
-  configService = configService;
-  return {
-    type: 'postgres',
-    entities: ['dist/**/*.entity.js'],
-    subscribers: ['dist/**/*.subscriber.js'],
-    logging: false,
-    synchronize: false,
-    migrations: ['dist/database/migrations/*.js'],
-    replication: {
-      master: {
-        host: configService.get('PGHOST'),
-        port: configService.get('PGPORT'),
-        username: configService.get('PGUSER'),
-        password: configService.get('PGPASSWORD'),
-        database: `${configService.get('PGDATABASE')}${
-          process.env.NODE_ENV.trim() == 'test' ? '_test' : ''
-        }`,
-      },
-      slaves: [],
-    },
-  };
 };
+
+export default new DataSource(ormOptions as DataSourceOptions);
