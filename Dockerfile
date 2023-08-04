@@ -25,4 +25,14 @@ COPY . .
 
 COPY --from=development /usr/src/app/dist ./dist
 
+COPY start.sh .
+
+COPY wait-for.sh .
+
+RUN chmod +x /usr/src/app/start.sh
+
+RUN chmod +x /usr/src/app/wait-for.sh
+
 CMD ["node", "dist/main"]
+
+ENTRYPOINT [ "/usr/src/app/start.sh" ]
