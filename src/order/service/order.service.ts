@@ -1,18 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
+import { CreateOrderRequest, OrderLineItems, OrderStatus } from '../dto/order';
 import { OrderRepository } from '../repository/order.repository';
-import { CreateOrderRequest, OrderLineItems, OrderResponse, OrderStatus } from '../dto/order';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order_items.entity';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityManager } from 'typeorm';
 
 @Injectable()
 export class OrderService {
-  constructor(
-    private orderRepository: OrderRepository,
-    private readonly dataSource: DataSource,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private orderRepository: OrderRepository, private readonly dataSource: DataSource) {}
 
   findOrderHistory(userId: string): Promise<Order[]> {
     return this.orderRepository.findUserOrderHistory(userId);
@@ -22,11 +17,7 @@ export class OrderService {
     return this.orderRepository.findOrder(orderId);
   }
 
-  async createOder(
-    input: CreateOrderRequest,
-    manager: EntityManager,
-    token: string,
-  ): Promise<OrderResponse> {
+  async createOder(input: CreateOrderRequest, manager: EntityManager): Promise<Order> {
     const order = new Order();
     order.userId = input.userId;
     order.status = OrderStatus.PENDING;
@@ -36,18 +27,12 @@ export class OrderService {
     order.orderTotal = input.total;
     order.orderItems = this.createOrderDetails(input.orderLineItems);
     const newOrder = await manager.save(order);
-    this.eventEmitter.emit('order.created', input, newOrder.id, token);
-    return {
-      orderId: newOrder.id,
-      orderTotal: newOrder.orderTotal,
-      status: 'success',
-      message: 'Order created successfully!',
-    };
+    return newOrder;
   }
 
-  createOrderInTransaction(input: CreateOrderRequest, token: string) {
+  createOrderInTransaction(input: CreateOrderRequest) {
     return this.dataSource.transaction((manager: EntityManager) => {
-      return this.createOder(input, manager, token);
+      return this.createOder(input, manager);
     });
   }
 
@@ -65,20 +50,10 @@ export class OrderService {
     return this.orderRepository.find();
   }
 
-  async updateOrderStatus(
-    orderId: string,
-    status: OrderStatus,
-    token: string,
-  ): Promise<OrderResponse> {
+  async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order> {
     const order = await this.orderRepository.getById(orderId);
     if (!order) throw new NotFoundException('Order not found!');
     order.status = status;
-    await this.orderRepository.save(order);
-    this.eventEmitter.emit('order_status_updated', order, token);
-    return {
-      orderId,
-      status: 'success',
-      message: 'Order status updated successfully!',
-    };
+    return this.orderRepository.save(order);
   }
 }

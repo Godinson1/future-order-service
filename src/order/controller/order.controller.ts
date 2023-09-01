@@ -4,12 +4,14 @@ import { CreateOrderRequest, OrderResponse, OrderStatus } from '../dto/order';
 import { Order } from '../entities/order.entity';
 import { Ctx, EventPattern, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
 import { JwtAuthGuard, RmqService, extractTokenFromHeader } from 'future-connectors';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Controller('order')
 export class OrderController {
   constructor(
     private readonly orderService: OrderService,
     private readonly rmqService: RmqService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Get()
@@ -24,8 +26,16 @@ export class OrderController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  createOder(@Body() input: CreateOrderRequest, @Req() req: any): Promise<OrderResponse> {
-    return this.orderService.createOrderInTransaction(input, extractTokenFromHeader(req));
+  async createOder(@Body() input: CreateOrderRequest, @Req() req: any): Promise<OrderResponse> {
+    const token = extractTokenFromHeader(req);
+    const order = await this.orderService.createOrderInTransaction(input);
+    this.eventEmitter.emit('order.created', input, order.id, token);
+    return {
+      orderId: order.id,
+      orderTotal: order.orderTotal,
+      status: 'success',
+      message: 'Order created successfully!',
+    };
   }
 
   @Put('/:id')
@@ -34,12 +44,18 @@ export class OrderController {
   }
 
   @Patch(':id')
-  updateOrderStatus(
+  async updateOrderStatus(
     @Param() params: any,
     @Body() input: { status: OrderStatus },
     token?: string,
   ): Promise<OrderResponse> {
-    return this.orderService.updateOrderStatus(params.id, input.status, token);
+    const order = await this.orderService.updateOrderStatus(params.id, input.status);
+    this.eventEmitter.emit('order_status_updated', order, token);
+    return {
+      orderId: order.id,
+      status: 'success',
+      message: 'Order status updated successfully!',
+    };
   }
 
   @EventPattern('order_verified')
@@ -48,7 +64,8 @@ export class OrderController {
     @Payload() data: { status: OrderStatus; orderId: string; Authentication: string },
     @Ctx() context: RmqContext,
   ) {
-    this.orderService.updateOrderStatus(data.orderId, OrderStatus.VERIFIED, data.Authentication);
+    const order = this.orderService.updateOrderStatus(data.orderId, OrderStatus.VERIFIED);
+    this.eventEmitter.emit('order_status_updated', order, data.Authentication);
     this.rmqService.ack(context as any);
   }
 

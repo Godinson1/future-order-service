@@ -17,7 +17,6 @@ import { OrderEvents } from './events/order.event';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order]),
-    RmqModule,
     AuthModule,
     RmqModule.register({ name: AUTH_SERVICE }),
     RmqModule.register({ name: INVENTORY_SERVICE }),

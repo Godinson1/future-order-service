@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  user:
+  order:
     image: godinson/future-order
     container_name: future-order
     ports:
